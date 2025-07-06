@@ -20,6 +20,15 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 CORS(app)
 db = SQLAlchemy(app)
 
+# Simple root route to show API is running
+@app.route('/')
+def index():
+    """Return a basic message for the API root."""
+    return jsonify({
+        'message': 'iRecipe API',
+        'usage': 'Run the React frontend separately to use the web app.'
+    })
+
 # Association table between recipes and ingredients
 recipe_ingredients = db.Table(
     'recipe_ingredients',

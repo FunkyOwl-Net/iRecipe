@@ -22,5 +22,8 @@ This Flask backend provides a REST API for managing recipes. It stores data in a
 
 Uploaded images are stored in the `uploads/` folder.
 
+Access `http://localhost:5000/` in your browser to verify the API is running; it
+returns a short JSON message.
+
 ## Tests
 Run `pytest` to execute the unit tests.

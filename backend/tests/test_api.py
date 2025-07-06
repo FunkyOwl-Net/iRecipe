@@ -4,7 +4,7 @@ import os
 import tempfile
 import json
 import pytest
-from app import app, db, Recipe
+from backend.app import app, db, Recipe
 
 @pytest.fixture
 def client():

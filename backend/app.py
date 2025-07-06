@@ -1,8 +1,10 @@
 """Flask application entry point with API routes."""
 
 import os
+import uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+import click
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
@@ -79,8 +81,11 @@ def get_recipe(recipe_id):
 @app.route('/api/recipes', methods=['POST'])
 def create_recipe():
     """Create a new recipe."""
-    data = request.json
-    recipe = Recipe(title=data['title'], description=data.get('description'))
+    data = request.get_json()
+    if not data or not data.get('title'):
+        return jsonify({'error': 'Missing title'}), 400
+
+    recipe = Recipe(title=data['title'], description=data.get('description', ''))
     ingredient_names = data.get('ingredients', [])
     for name in ingredient_names:
         ingredient = Ingredient.query.filter_by(name=name).first()
@@ -95,7 +100,9 @@ def create_recipe():
 def update_recipe(recipe_id):
     """Update an existing recipe."""
     recipe = Recipe.query.get_or_404(recipe_id)
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Invalid request'}), 400
     recipe.title = data.get('title', recipe.title)
     recipe.description = data.get('description', recipe.description)
     if 'ingredients' in data:
@@ -120,8 +127,18 @@ def delete_recipe(recipe_id):
 def rate_recipe(recipe_id):
     """Add a rating to a recipe."""
     recipe = Recipe.query.get_or_404(recipe_id)
-    data = request.json
-    rating = Rating(score=int(data['score']), recipe=recipe)
+    data = request.get_json()
+
+    if not data or 'score' not in data:
+        return jsonify({'error': 'Missing score'}), 400
+
+    try:
+        score = int(data['score'])
+        if not 1 <= score <= 5: # Assuming a 1-5 rating scale
+             raise ValueError("Score out of range")
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid score. Must be an integer between 1 and 5.'}), 400
+    rating = Rating(score=score, recipe=recipe)
     db.session.add(rating)
     db.session.commit()
     return jsonify({'score': rating.score}), 201
@@ -132,9 +149,15 @@ def upload_image(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
     if 'image' not in request.files:
         return jsonify({'error': 'No image uploaded'}), 400
+
     file = request.files['image']
-    filename = secure_filename(file.filename)
+    if not file or file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    _, ext = os.path.splitext(file.filename)
+    filename = secure_filename(f"{uuid.uuid4()}{ext}")
     path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
     file.save(path)
     img = RecipeImage(path=filename, recipe=recipe)
     db.session.add(img)
@@ -146,8 +169,11 @@ def get_image(filename):
     """Serve uploaded images."""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+@app.cli.command("init-db")
+def init_db_command():
+    """Creates the database tables."""
+    db.create_all()
+    click.echo("Initialized the database.")
+
 if __name__ == '__main__':
-    # Create tables if they do not exist
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
